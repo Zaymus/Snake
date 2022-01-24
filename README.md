@@ -20,11 +20,11 @@
 
 - _Open terminal or a similar app on your computer_
 - _change directory to where you want the files to be stored_
-- _copy <span>https://github.com/Zaymus/snake</span>_
+- _copy <span>https://github.com/Zaymus/Snake</span>_
 - _use git clone and paste that link after it to clone the repository_
 - _open the folder it provides_
 - _open the HTML folder inside_
-- _https://zaymus.github.io/snake/_
+- _https://zaymus.github.io/Snake/_
 
 ## Known Bugs <a name="bugs"></a>
 
