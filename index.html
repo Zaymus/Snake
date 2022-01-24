@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Snake</title>
+	</head>
+	<body>
+		<style>
+			@font-face {
+				font-family: "PressStart";
+				src: url("resources/assets/fonts/PressStart2P.ttf") format("truetype");
+			}
+
+			* {
+				margin: 0;
+				font-size: 28px;
+				font-family: "PressStart";
+			}
+
+			body {
+				background: hsl(0, 0%, 70%);
+				display: flex;
+				justify-content: center;
+			}
+
+			#container {
+				display: flex;
+				width: 100%;
+				height: 95vh;
+				margin-top: 5vh;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+			}
+
+			#menu-container {
+				position: absolute;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 100%;
+				display: flex;
+				flex-direction: column;
+				justify-content: center;
+				align-items: center;
+				background: hsla(0, 0%, 0%, 0.1);
+				backdrop-filter: blur(10px);
+				transition: all ease 700ms 500ms;
+			}
+
+			#menu-container[data-state="hidden"] {
+				visibility: hidden;
+				opacity: 0;
+			}
+
+			#menu-container[data-state="visible"] {
+				visibility: visible;
+				opacity: 1;
+			}
+
+			#menu {
+				position: relative;
+				width: 600px;
+				height: 400px;
+				display: flex;
+				flex-direction: column;
+				justify-content: space-evenly;
+				align-items: center;
+				background-color: white;
+				border-radius: 50px;
+				transition: top linear 1000ms 1300ms;
+			}
+
+			#menu[data-state="hidden"] {
+				top: -100%;
+			}
+
+			#menu[data-state="visible"] {
+				top: 0;
+			}
+
+			#menu span {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+			}
+
+			#menu h2 {
+				animation-delay: 2300ms;
+				animation: flash 2000ms infinite;
+			}
+
+			#menu h2:hover {
+				cursor: pointer;
+			}
+
+			@keyframes flash {
+				0% {
+					opacity: 0.3;
+				}
+				50% {
+					opacity: 1;
+				}
+				100% {
+					opacity: 0.3;
+				}
+			}
+
+			h2,
+			p {
+				font-size: 0.75rem;
+			}
+
+			#game-header {
+				display: flex;
+				width: 600px;
+				justify-content: center;
+			}
+		</style>
+		<div id="container">
+			<div id="menu-container" data-state="hidden">
+				<div id="menu" data-state="hidden">
+					<span>
+						<h1>Game Over</h1>
+						<p id="final-score-display">score:&nbsp;</p>
+					</span>
+					<h2>Play Again?</h2>
+				</div>
+			</div>
+			<div id="game-header">
+				<h2>Score:&nbsp;</h2>
+				<h2 id="score-display"></h2>
+			</div>
+			<canvas id="gc" width="600" height="600"></canvas>
+		</div>
+
+		<script>
+			const menuContainer = document.getElementById("menu-container");
+			const menu = document.getElementById("menu");
+			const scoreDisplay = document.getElementById("score-display");
+			const finalScoreDisplay = document.getElementById("final-score-display");
+
+			menu.childNodes[3].addEventListener("mouseover", () => {
+				menu.childNodes[3].innerHTML = "> Play Again? <";
+			});
+
+			menu.childNodes[3].addEventListener("mouseout", () => {
+				menu.childNodes[3].innerHTML = "Play Again?";
+			});
+
+			menu.childNodes[3].addEventListener("click", () => {
+				reset();
+			});
+
+			var gameLoop;
+			window.onload = function () {
+				canv = document.getElementById("gc");
+				canv.width = GAME_AREA_SIZE;
+				canv.height = GAME_AREA_SIZE;
+				ctx = canv.getContext("2d");
+				document.addEventListener("keydown", keyPush);
+				gameLoop = setInterval(game, 1000 / 15);
+			};
+			const GAME_AREA_SIZE = 600;
+			const GAME_SIZE = 20;
+			const TILE_COUNT = GAME_AREA_SIZE / GAME_SIZE;
+			const TILE_GAP = 2;
+
+			const BG_COLOUR = "black";
+			const DEFAULT_APPLE_COLOUR = "red";
+			const DEFAULT_SNAKE_COLOUR = "lime";
+			const DEAD_SNAKE_COLOUR = "orange";
+
+			var appleColour = DEFAULT_APPLE_COLOUR;
+			var snakeColour = DEFAULT_SNAKE_COLOUR;
+			var score = 0;
+
+			function getRandomLocation() {
+				return 20 * Math.floor(Math.random() * TILE_COUNT);
+			}
+
+			class SnakePart {
+				constructor(x = getRandomLocation(), y = getRandomLocation()) {
+					this.x = x;
+					this.y = y;
+				}
+			}
+
+			class Apple extends SnakePart {
+				constructor(x = getRandomLocation(), y = getRandomLocation()) {
+					super(x, y);
+				}
+
+				relocate() {
+					this.x = getRandomLocation();
+					this.y = getRandomLocation();
+				}
+			}
+
+			class Snake {
+				constructor() {
+					this.head = new SnakePart(getRandomLocation(), getRandomLocation());
+					this.tail = [];
+					this.xVel = 0;
+					this.yVel = 0;
+				}
+
+				move() {
+					if (
+						(this.head.x <= 0 && this.xVel == -GAME_SIZE) ||
+						(this.head.y == 0 && this.yVel == -GAME_SIZE) ||
+						(this.head.x == GAME_AREA_SIZE - GAME_SIZE &&
+							this.xVel == GAME_SIZE) ||
+						(this.head.y == GAME_AREA_SIZE - GAME_SIZE &&
+							this.yVel == GAME_SIZE)
+					) {
+						gameOver();
+					} else {
+						for (let i = this.tail.length - 1; i >= 0; i--) {
+							if (i == 0) {
+								this.tail[i].x = this.head.x;
+								this.tail[i].y = this.head.y;
+							} else {
+								this.tail[i].x = this.tail[i - 1].x;
+								this.tail[i].y = this.tail[i - 1].y;
+							}
+						}
+
+						this.head.x += this.xVel;
+						this.head.y += this.yVel;
+
+						snake.tail.forEach((body) => {
+							if (body.x == snake.head.x && body.y == snake.head.y) {
+								gameOver();
+							}
+						});
+					}
+				}
+
+				grow() {
+					if (this.tail.length == 0) {
+						this.tail.push(new SnakePart(this.head.x, this.head.y));
+					} else {
+						this.tail.push(
+							new SnakePart(
+								this.tail[this.tail.length - 1].x,
+								this.tail[this.tail.length - 1].y
+							)
+						);
+					}
+				}
+			}
+
+			var snake = new Snake();
+			var apple = new Apple();
+
+			function reset() {
+				snakeColour = DEFAULT_SNAKE_COLOUR;
+				snake = new Snake();
+				apple = new Apple();
+				score = 0;
+
+				menuContainer.setAttribute("data-state", "hidden");
+				menu.setAttribute("data-state", "hidden");
+
+				gameLoop = setInterval(game, 1000 / 15);
+				finalScoreDisplay.innerHTML = "Score: ";
+			}
+
+			function game() {
+				snake.move();
+				if (snake.head.x == apple.x && snake.head.y == apple.y) {
+					snake.grow();
+					score += Math.round(snake.tail.length / (TILE_COUNT / 2) + 1);
+					let loop = true;
+					while (loop) {
+						apple.relocate();
+						loop = false;
+						snake.tail.forEach((snakeTail) => {
+							if (snakeTail.x == apple.x && snakeTail.y == apple.y) {
+								loop = true;
+							}
+						});
+					}
+				}
+				console.log(snake.tail.length / (TILE_COUNT / 2), score);
+				scoreDisplay.innerHTML = score;
+				draw();
+			}
+
+			function gameOver() {
+				snakeColour = DEAD_SNAKE_COLOUR;
+				clearInterval(gameLoop);
+				finalScoreDisplay.innerHTML += score;
+				menuContainer.setAttribute("data-state", "visible");
+				menu.setAttribute("data-state", "visible");
+			}
+
+			function draw() {
+				ctx.fillStyle = BG_COLOUR;
+				ctx.fillRect(0, 0, canv.width, canv.height);
+
+				ctx.fillStyle = appleColour;
+				ctx.fillRect(
+					apple.x,
+					apple.y,
+					GAME_SIZE - TILE_GAP,
+					GAME_SIZE - TILE_GAP
+				);
+
+				ctx.fillStyle = snakeColour;
+				ctx.fillRect(
+					snake.head.x,
+					snake.head.y,
+					GAME_SIZE - TILE_GAP,
+					GAME_SIZE - TILE_GAP
+				);
+
+				snake.tail.forEach((body) => {
+					ctx.fillRect(
+						body.x,
+						body.y,
+						GAME_SIZE - TILE_GAP,
+						GAME_SIZE - TILE_GAP
+					);
+				});
+			}
+
+			function keyPush(evt) {
+				let key = evt.keyCode;
+				if (
+					(key == 37 || key == 65) &&
+					(snake.xVel != GAME_SIZE || snake.tail.length == 0)
+				) {
+					// Left
+					snake.xVel = -GAME_SIZE;
+					snake.yVel = 0;
+				} else if (
+					(key == 38 || key == 87) &&
+					(snake.yVel != GAME_SIZE || snake.tail.length == 0)
+				) {
+					// Up
+					snake.xVel = 0;
+					snake.yVel = -GAME_SIZE;
+				} else if (
+					(key == 39 || key == 68) &&
+					(snake.xVel != -GAME_SIZE || snake.tail.length == 0)
+				) {
+					// Right
+					snake.xVel = GAME_SIZE;
+					snake.yVel = 0;
+				} else if (
+					(key == 40 || key == 83) &&
+					(snake.yVel != -GAME_SIZE || snake.tail.length == 0)
+				) {
+					// Down
+					snake.xVel = 0;
+					snake.yVel = GAME_SIZE;
+				}
+			}
+		</script>
+	</body>
+</html>
